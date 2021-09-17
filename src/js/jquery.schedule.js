@@ -1,12 +1,12 @@
 (function ($, window, document, undefined) {
     "use strict";
-
     // Defaults options
     var defaults = {
             mode: "edit", // read
             hour: 24, // 12
             days: 7, // 7/5
-            periodDuration: 30, // 15/30/60
+            periodDuration: 1, // 1/15/30/60
+            periodDurationOnClick: 60,
             data: [],
             periodOptions: true,
             periodColors: [],
@@ -99,7 +99,9 @@
             }
 
             // duration validation
-            if ($.inArray(this.settings.periodDuration, [15, 30, 60]) === -1) {
+            if (
+                $.inArray(this.settings.periodDuration, [1, 15, 30, 60]) === -1
+            ) {
                 throw new Error("Invalid periodDuration");
             }
 
@@ -128,7 +130,10 @@
                     ) {
                         var time = "";
                         if ($this.settings.periodDuration !== 15) {
-                            time = $this.periodInit(position, position + 1);
+                            time = $this.periodInit(
+                                position,
+                                position + $this.settings.periodDurationOnClick
+                            );
                         }
 
                         helper = $("<div>")
@@ -180,8 +185,8 @@
                         var height =
                             Math.round(offset / $this.periodPosition) -
                             position;
-                        if (height <= 0) {
-                            height = 1;
+                        if (height <= 1) {
+                            height = $this.settings.periodDurationOnClick;
                         }
 
                         $this.add($(this), position, height);
@@ -569,10 +574,27 @@
                 period.position().top / this.periodPosition
             );
             var height = Math.round(period.height() / this.periodPosition);
-            var time =
-                '<div class="jqs-options-time">' +
-                this.periodInit(position, position + height) +
-                "</div>";
+            var [startHour, startMn] = this.getTimeFromPosition(position);
+            var [endHour, endMn] = this.getTimeFromPosition(position + height);
+
+            var $time = $(`<div class="jqs-options-time">
+            <div>
+              <span>Start</span>
+              <input min="0" max="23" style="width: 60px" type="number" value="${startHour}"> :
+              <input min="0" max="59" style="width: 60px" type="number" value="${startMn}"> 
+            </div>
+            <div>
+              <span>End</span>
+              <input type="number" value="${endHour}"> : <input type="number" value="${endMn}"> 
+            </div>
+          </div>`);
+
+            $time.find("input").each((i, input) => {
+                var $input = $(input);
+                $input.on("change", function (e) {
+                    var { value } = e;
+                });
+            });
 
             // title
             var title = $("jqs-period-title", period).text();
@@ -621,7 +643,6 @@
             var close = '<div class="jqs-options-close"></div>';
             $(
                 '<div class="jqs-options">' +
-                    time +
                     titleInput +
                     colorInput +
                     remove +
@@ -629,6 +650,7 @@
                     close +
                     "</div>"
             )
+                .prepend($time)
                 .css({
                     top: top,
                     left: left,
@@ -753,6 +775,12 @@
             };
         },
 
+        getTimeFromPosition: function (position) {
+            var hour = Math.floor(position / this.periodInterval);
+            var mn = Math.round((position / this.periodInterval - hour) * 60);
+            return [hour, mn];
+        },
+
         /**
          * Return a readable hour from a position
          * @param position
@@ -766,9 +794,7 @@
             if (position < 0) {
                 position = 0;
             }
-
-            var hour = Math.floor(position / this.periodInterval);
-            var mn = (position / this.periodInterval - hour) * 60;
+            var [hour, mn] = this.getTimeFromPosition(position);
 
             if (this.settings.hour === 12) {
                 var time = hour;
